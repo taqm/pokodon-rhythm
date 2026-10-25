@@ -16,6 +16,12 @@ import {
 } from "../palette";
 import { BEATS_PER_BAR, FEVER_COMBO, type Judge, type PadId } from "../rhythm";
 import { CREW_ROLES } from "../voiceLines";
+import {
+	clampVolume,
+	loadVolume,
+	saveVolume,
+	type VolumeKind,
+} from "../volume";
 
 const CREW_SIZE = CREW_ROLES.length;
 
@@ -398,9 +404,18 @@ export class PlayScene extends Phaser.Scene {
 		dim.setInteractive();
 		const card = this.add.graphics();
 		card.fillStyle(C.card, 1);
-		card.fillRoundedRect(30, 250, W - 60, 300, 24);
+		card.fillRoundedRect(30, 150, W - 60, 520, 24);
+		const heading = (y: number, text: string) =>
+			this.add
+				.text(56, y, text, {
+					fontFamily: FONT,
+					fontSize: "14px",
+					fontStyle: "700",
+					color: hex(C.text),
+				})
+				.setOrigin(0, 0.5);
 		const title = this.add
-			.text(W / 2, 290, "タイミング調整", {
+			.text(W / 2, 188, "オプション", {
 				fontFamily: FONT,
 				fontSize: "16px",
 				fontStyle: "700",
@@ -408,14 +423,14 @@ export class PlayScene extends Phaser.Scene {
 			})
 			.setOrigin(0.5);
 		const note = this.add
-			.text(W / 2, 325, "早押しでミスになるならマイナス側へ", {
+			.text(56, 432, "早押しでミスになるならマイナス側へ", {
 				fontFamily: FONT,
 				fontSize: "12px",
 				color: hex(C.textMid),
 			})
-			.setOrigin(0.5);
+			.setOrigin(0, 0.5);
 		this.offsetText = this.add
-			.text(W / 2, 390, "", {
+			.text(W / 2, 482, "", {
 				fontFamily: MONO,
 				fontSize: "20px",
 				color: hex(C.text),
@@ -425,20 +440,25 @@ export class PlayScene extends Phaser.Scene {
 			dim,
 			card,
 			title,
+			heading(238, "BGM"),
+			...this.makeVolumeSlider(274, "bgm"),
+			heading(322, "キャラの声"),
+			...this.makeVolumeSlider(358, "voice"),
+			heading(406, "タイミング調整"),
 			note,
 			this.offsetText,
-			this.button(100, 390, 80, "-10", C.bg, hex(C.textMid), () =>
+			this.button(100, 482, 80, "-10", C.bg, hex(C.textMid), () =>
 				this.shiftOffset(-10),
 			),
-			this.button(W - 100, 390, 80, "+10", C.bg, hex(C.textMid), () =>
+			this.button(W - 100, 482, 80, "+10", C.bg, hex(C.textMid), () =>
 				this.shiftOffset(10),
 			),
-			this.button(125, 490, 140, "タイトルへ", C.bg, hex(C.textMid), () =>
+			this.button(125, 610, 140, "タイトルへ", C.bg, hex(C.textMid), () =>
 				this.scene.start("title"),
 			),
 			this.button(
 				W - 125,
-				490,
+				610,
 				140,
 				"とじる",
 				PAD_COLOR.don.base,
@@ -446,6 +466,64 @@ export class PlayScene extends Phaser.Scene {
 				() => this.openMenu(false),
 			),
 		]);
+	}
+
+	/** 音量スライダー。つまみをドラッグするか、線をタップして 0〜100% を選ぶ */
+	private makeVolumeSlider(
+		y: number,
+		kind: VolumeKind,
+	): Phaser.GameObjects.GameObject[] {
+		const x0 = 56;
+		const width = W - 56 * 2 - 64;
+		const track = this.add.graphics();
+		const knob = this.add.circle(x0, y, 14, PAD_COLOR.don.base);
+		knob.setStrokeStyle(4, C.card);
+		const label = this.add
+			.text(x0 + width + 64, y, "", {
+				fontFamily: MONO,
+				fontSize: "14px",
+				color: hex(C.textMid),
+			})
+			.setOrigin(1, 0.5);
+		const render = (v: number) => {
+			track.clear();
+			track.fillStyle(C.bg, 1);
+			track.fillRoundedRect(x0, y - 4, width, 8, 4);
+			track.fillStyle(PAD_COLOR.don.base, 1);
+			track.fillRoundedRect(x0, y - 4, Math.max(width * v, 8), 8, 4);
+			knob.x = x0 + width * v;
+			label.setText(`${Math.round(v * 100)}%`);
+		};
+		const apply = (pointerX: number) => {
+			const v = clampVolume((pointerX - x0) / width);
+			this.conductor.synth.setVolume(kind, v);
+			saveVolume(kind, v);
+			render(v);
+		};
+		// 指で触りやすいよう、線の上下にも広く当たり判定を取る
+		const zone = this.add
+			.rectangle(x0 - 16, y - 24, width + 32, 48, 0, 0)
+			.setOrigin(0)
+			.setInteractive({ useHandCursor: true });
+		let dragging = false;
+		zone.on("pointerdown", (p: Phaser.Input.Pointer) => {
+			dragging = true;
+			apply(p.x);
+		});
+		const move = (p: Phaser.Input.Pointer) => {
+			if (dragging) apply(p.x);
+		};
+		const up = () => {
+			dragging = false;
+		};
+		this.input.on("pointermove", move);
+		this.input.on("pointerup", up);
+		this.events.once("shutdown", () => {
+			this.input.off("pointermove", move);
+			this.input.off("pointerup", up);
+		});
+		render(loadVolume(kind));
+		return [track, knob, label, zone];
 	}
 
 	private button(

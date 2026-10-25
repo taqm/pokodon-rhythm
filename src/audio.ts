@@ -7,10 +7,14 @@ import {
 	type VoiceManifest,
 	voiceKey,
 } from "./voiceLines";
+import { loadVolume, type VolumeKind, volumeToGain } from "./volume";
 
 export class Synth {
 	readonly ctx: AudioContext;
+	/** BGM（伴奏・楽器・クリック）の出口。楽器の音は特に指定がなければここへ出す */
 	private readonly out: GainNode;
+	/** キャラの声の出口 */
+	private readonly voiceOut: GainNode;
 	private readonly noise: AudioBuffer;
 	/** 子分の合唱をまとめるバス。人数ぶん重ねても割れないよう専用のコンプレッサーを通す */
 	private readonly crewBus: GainNode;
@@ -34,9 +38,16 @@ export class Synth {
 		comp.threshold.value = -14;
 		comp.ratio.value = 4;
 		comp.connect(limiter);
+		const mix = this.ctx.createGain();
+		mix.gain.value = 0.6;
+		mix.connect(comp);
+		// BGM と声は音量を別々に変えられるよう、混ぜる前に分けておく
 		this.out = this.ctx.createGain();
-		this.out.gain.value = 0.6;
-		this.out.connect(comp);
+		this.out.gain.value = volumeToGain(loadVolume("bgm"));
+		this.out.connect(mix);
+		this.voiceOut = this.ctx.createGain();
+		this.voiceOut.gain.value = volumeToGain(loadVolume("voice"));
+		this.voiceOut.connect(mix);
 
 		const crewComp = this.ctx.createDynamicsCompressor();
 		crewComp.threshold.value = -18;
@@ -44,7 +55,7 @@ export class Synth {
 		crewComp.ratio.value = 6;
 		crewComp.attack.value = 0.003;
 		crewComp.release.value = 0.15;
-		crewComp.connect(this.out);
+		crewComp.connect(this.voiceOut);
 		this.crewBus = this.ctx.createGain();
 		this.crewBus.connect(crewComp);
 
@@ -52,6 +63,12 @@ export class Synth {
 		this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
 		const data = this.noise.getChannelData(0);
 		for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+	}
+
+	/** 音量スライダーの値（0〜1）を反映する。ブツッと鳴らないよう短く滑らかに変える */
+	setVolume(kind: VolumeKind, v: number): void {
+		const node = kind === "bgm" ? this.out : this.voiceOut;
+		node.gain.setTargetAtTime(volumeToGain(v), this.ctx.currentTime, 0.02);
 	}
 
 	private env(t: number, peak: number, decay: number): GainNode {
@@ -389,7 +406,7 @@ export class Synth {
 		amp.gain.exponentialRampToValueAtTime(peak, vt + 0.015);
 		amp.gain.setValueAtTime(peak, vt + dur * 0.6);
 		amp.gain.exponentialRampToValueAtTime(0.0001, vt + dur);
-		amp.connect(this.out);
+		amp.connect(this.voiceOut);
 
 		const src = ctx.createOscillator();
 		src.type = "sawtooth";
@@ -480,7 +497,7 @@ export class Synth {
 			g.connect(panner);
 			node = panner;
 		}
-		node.connect(opts.dest ?? this.out);
+		node.connect(opts.dest ?? this.voiceOut);
 		src.start(Math.max(this.ctx.currentTime, t - v.lead / rate));
 		return true;
 	}
