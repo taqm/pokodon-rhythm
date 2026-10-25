@@ -31,6 +31,22 @@ bun run check
 bun run build   # dist/ に出力。任意の静的ホスティングに置ける
 ```
 
+## デプロイ（Cloudflare Workers）
+
+GitHub 連携の Workers Builds で、`main` に push すると自動でビルド・デプロイされる。
+設定は `wrangler.jsonc`（`dist/` を静的アセットとして配信）。ダッシュボード側の設定:
+
+- Build command: `bun run build`
+- Deploy command: `bunx wrangler deploy`
+
+Worker 名はダッシュボードと `wrangler.jsonc` の `name` を一致させること。
+
+手元から直接デプロイする場合:
+
+```bash
+bun run build && bunx wrangler deploy
+```
+
 ## 子分の掛け声を作り直す
 
 掛け声の文言と配役（話者・スタイル）は `src/voiceLines.ts`。変更したら VOICEVOX エンジンを起動して再生成する。
