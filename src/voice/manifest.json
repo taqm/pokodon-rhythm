@@ -1,0 +1,191 @@
+{
+	"player-don-hit": {
+		"lead": 0.045
+	},
+	"player-don-rise": {
+		"lead": 0.045
+	},
+	"player-don-finish": {
+		"lead": 0.045
+	},
+	"player-shaka-hit": {
+		"lead": 0.045
+	},
+	"player-shaka-rise": {
+		"lead": 0.045
+	},
+	"player-shaka-finish": {
+		"lead": 0.045
+	},
+	"player-poko-hit": {
+		"lead": 0.045
+	},
+	"player-poko-rise": {
+		"lead": 0.045
+	},
+	"player-poko-finish": {
+		"lead": 0.045
+	},
+	"crew0-don-hit": {
+		"lead": 0.0223
+	},
+	"crew0-don-rise": {
+		"lead": 0.0223
+	},
+	"crew0-don-finish": {
+		"lead": 0.0448
+	},
+	"crew0-shaka-hit": {
+		"lead": 0.045
+	},
+	"crew0-shaka-rise": {
+		"lead": 0.045
+	},
+	"crew0-shaka-finish": {
+		"lead": 0.045
+	},
+	"crew0-poko-hit": {
+		"lead": 0.0349
+	},
+	"crew0-poko-rise": {
+		"lead": 0.0349
+	},
+	"crew0-poko-finish": {
+		"lead": 0.01
+	},
+	"crew1-don-hit": {
+		"lead": 0.045
+	},
+	"crew1-don-rise": {
+		"lead": 0.045
+	},
+	"crew1-don-finish": {
+		"lead": 0.045
+	},
+	"crew1-shaka-hit": {
+		"lead": 0.045
+	},
+	"crew1-shaka-rise": {
+		"lead": 0.045
+	},
+	"crew1-shaka-finish": {
+		"lead": 0.045
+	},
+	"crew1-poko-hit": {
+		"lead": 0.045
+	},
+	"crew1-poko-rise": {
+		"lead": 0.045
+	},
+	"crew1-poko-finish": {
+		"lead": 0.045
+	},
+	"crew2-don-hit": {
+		"lead": 0.045
+	},
+	"crew2-don-rise": {
+		"lead": 0.045
+	},
+	"crew2-don-finish": {
+		"lead": 0.0436
+	},
+	"crew2-shaka-hit": {
+		"lead": 0.045
+	},
+	"crew2-shaka-rise": {
+		"lead": 0.045
+	},
+	"crew2-shaka-finish": {
+		"lead": 0.045
+	},
+	"crew2-poko-hit": {
+		"lead": 0.045
+	},
+	"crew2-poko-rise": {
+		"lead": 0.045
+	},
+	"crew2-poko-finish": {
+		"lead": 0.045
+	},
+	"crew3-don-hit": {
+		"lead": 0.045
+	},
+	"crew3-don-rise": {
+		"lead": 0.045
+	},
+	"crew3-don-finish": {
+		"lead": 0.0444
+	},
+	"crew3-shaka-hit": {
+		"lead": 0.045
+	},
+	"crew3-shaka-rise": {
+		"lead": 0.045
+	},
+	"crew3-shaka-finish": {
+		"lead": 0.045
+	},
+	"crew3-poko-hit": {
+		"lead": 0.044
+	},
+	"crew3-poko-rise": {
+		"lead": 0.044
+	},
+	"crew3-poko-finish": {
+		"lead": 0.0132
+	},
+	"crew4-don-hit": {
+		"lead": 0.0388
+	},
+	"crew4-don-rise": {
+		"lead": 0.0388
+	},
+	"crew4-don-finish": {
+		"lead": 0.01
+	},
+	"crew4-shaka-hit": {
+		"lead": 0.045
+	},
+	"crew4-shaka-rise": {
+		"lead": 0.045
+	},
+	"crew4-shaka-finish": {
+		"lead": 0.045
+	},
+	"crew4-poko-hit": {
+		"lead": 0.045
+	},
+	"crew4-poko-rise": {
+		"lead": 0.045
+	},
+	"crew4-poko-finish": {
+		"lead": 0.045
+	},
+	"crew5-don-hit": {
+		"lead": 0.0274
+	},
+	"crew5-don-rise": {
+		"lead": 0.0274
+	},
+	"crew5-don-finish": {
+		"lead": 0.0311
+	},
+	"crew5-shaka-hit": {
+		"lead": 0.045
+	},
+	"crew5-shaka-rise": {
+		"lead": 0.045
+	},
+	"crew5-shaka-finish": {
+		"lead": 0.045
+	},
+	"crew5-poko-hit": {
+		"lead": 0.045
+	},
+	"crew5-poko-rise": {
+		"lead": 0.045
+	},
+	"crew5-poko-finish": {
+		"lead": 0.045
+	}
+}
