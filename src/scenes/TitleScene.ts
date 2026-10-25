@@ -1,10 +1,23 @@
 import Phaser from "phaser";
-import { Conductor } from "../conductor";
+import { Backing, FULL_COMBO, Synth } from "../audio";
+import { BEAT_SEC, Conductor } from "../conductor";
 import { Blob } from "../objects/Blob";
 import { C, FONT, H, hex, PAD_COLOR, PAD_ORDER, W } from "../palette";
+import { findSong, pickSong, RANDOM_LABEL, RANDOM_SONG, SONGS } from "../songs";
 import { VOICE_CREDITS } from "../voice";
 
+const SONG_KEY = "pokodon.song";
+const SELECT_Y = 532;
+const CHOICES = [RANDOM_SONG, ...SONGS.map((s) => s.id)];
+
 export class TitleScene extends Phaser.Scene {
+	/** 選択肢（先頭がランダム、続いて各曲）の何番目を選んでいるか */
+	private choiceIndex = 0;
+	private songName!: Phaser.GameObjects.Text;
+	private songMood!: Phaser.GameObjects.Text;
+	/** 曲選びのプレビュー。切り替えのたびに作り直さず、音声の土台は使い回す */
+	private preview: { synth: Synth; backing: Backing | null } | null = null;
+
 	constructor() {
 		super("title");
 	}
@@ -47,7 +60,7 @@ export class TitleScene extends Phaser.Scene {
 			},
 		});
 
-		const btn = this.add.container(W / 2, 600);
+		const btn = this.add.container(W / 2, 650);
 		const bg = this.add.graphics();
 		bg.fillStyle(PAD_COLOR.don.base, 1);
 		bg.fillRoundedRect(-150, -30, 300, 60, 30);
@@ -69,6 +82,8 @@ export class TitleScene extends Phaser.Scene {
 			ease: "Sine.InOut",
 		});
 
+		this.choiceIndex = Math.max(CHOICES.indexOf(loadChoice()), 0);
+		const arrows = this.makeSongSelect();
 		const creditBounds = this.makeCreditLink();
 		const modal = this.makeCreditModal();
 
@@ -78,7 +93,8 @@ export class TitleScene extends Phaser.Scene {
 		const start = () => {
 			detach();
 			lockPortrait();
-			const conductor = new Conductor();
+			this.stopPreview();
+			const conductor = new Conductor(pickSong(this.currentChoice()).id);
 			this.scene.start("play", { conductor });
 		};
 		const onPointer = (ev: PointerEvent) => {
@@ -88,6 +104,10 @@ export class TitleScene extends Phaser.Scene {
 				modal.setVisible(false);
 			} else if (creditBounds.contains(x, y)) {
 				modal.setVisible(true);
+			} else if (arrows.prev.contains(x, y)) {
+				this.changeSong(-1);
+			} else if (arrows.next.contains(x, y)) {
+				this.changeSong(1);
 			} else {
 				start();
 			}
@@ -97,7 +117,9 @@ export class TitleScene extends Phaser.Scene {
 				if (ev.key === "Escape" || ev.key === "Enter") modal.setVisible(false);
 				return;
 			}
-			start();
+			if (ev.key === "ArrowLeft") this.changeSong(-1);
+			else if (ev.key === "ArrowRight") this.changeSong(1);
+			else start();
 		};
 		const detach = () => {
 			canvas.removeEventListener("pointerup", onPointer);
@@ -105,7 +127,121 @@ export class TitleScene extends Phaser.Scene {
 		};
 		canvas.addEventListener("pointerup", onPointer);
 		window.addEventListener("keydown", onKey);
-		this.events.once("shutdown", detach);
+		this.events.once("shutdown", () => {
+			detach();
+			this.stopPreview();
+		});
+	}
+
+	private currentChoice(): string {
+		return CHOICES[this.choiceIndex] ?? RANDOM_SONG;
+	}
+
+	/** 曲名と左右の矢印。矢印の当たり判定の範囲を返す */
+	private makeSongSelect(): {
+		prev: Phaser.Geom.Rectangle;
+		next: Phaser.Geom.Rectangle;
+	} {
+		const card = this.add.graphics();
+		card.fillStyle(C.card, 1);
+		card.fillRoundedRect(28, SELECT_Y - 38, W - 56, 76, 38);
+		this.add
+			.text(W / 2, SELECT_Y - 52, "きょく", {
+				fontFamily: FONT,
+				fontSize: "12px",
+				fontStyle: "700",
+				color: hex(C.textMid),
+			})
+			.setOrigin(0.5);
+		this.songName = this.add
+			.text(W / 2, SELECT_Y - 10, "", {
+				fontFamily: FONT,
+				fontSize: "20px",
+				fontStyle: "900",
+				color: hex(C.text),
+			})
+			.setOrigin(0.5);
+		this.songMood = this.add
+			.text(W / 2, SELECT_Y + 18, "", {
+				fontFamily: FONT,
+				fontSize: "12px",
+				color: hex(C.textMid),
+			})
+			.setOrigin(0.5);
+
+		const arrow = (x: number, dir: -1 | 1) => {
+			const g = this.add.graphics();
+			g.fillStyle(PAD_COLOR.don.base, 1);
+			g.fillCircle(x, SELECT_Y, 22);
+			g.fillStyle(0xffffff, 1);
+			g.fillTriangle(
+				x + 8 * dir,
+				SELECT_Y,
+				x - 6 * dir,
+				SELECT_Y - 9,
+				x - 6 * dir,
+				SELECT_Y + 9,
+			);
+			// 指で押しやすいよう、見た目より広く取る
+			return new Phaser.Geom.Rectangle(x - 36, SELECT_Y - 38, 72, 76);
+		};
+		const prev = arrow(62, -1);
+		const next = arrow(W - 62, 1);
+		this.renderSong();
+		return { prev, next };
+	}
+
+	private renderSong(): void {
+		const choice = this.currentChoice();
+		if (choice === RANDOM_SONG) {
+			this.songName.setText(RANDOM_LABEL.name);
+			this.songMood.setText(RANDOM_LABEL.mood);
+		} else {
+			const song = findSong(choice);
+			this.songName.setText(song.name);
+			this.songMood.setText(song.mood);
+		}
+		this.songName.setScale(1.15);
+		this.tweens.add({
+			targets: this.songName,
+			scale: 1,
+			duration: 200,
+			ease: "Back.Out",
+		});
+	}
+
+	private changeSong(delta: number): void {
+		this.choiceIndex =
+			(this.choiceIndex + delta + CHOICES.length) % CHOICES.length;
+		saveChoice(this.currentChoice());
+		this.renderSong();
+		// ランダムは遊ぶときまで曲が決まらないので、試聴は止める
+		if (this.currentChoice() === RANDOM_SONG) this.stopPreview();
+		else this.playPreview();
+	}
+
+	/** 選んだ曲を盛り上がった状態で流す。矢印のタップ（ユーザ操作）の中で呼ぶ */
+	private playPreview(): void {
+		if (!this.preview) this.preview = { synth: new Synth(), backing: null };
+		const { synth } = this.preview;
+		void synth.ctx.resume();
+		this.preview.backing?.stop();
+		const backing = new Backing(
+			synth,
+			synth.ctx.currentTime + 0.05,
+			BEAT_SEC,
+			findSong(this.currentChoice()),
+		);
+		backing.combo = FULL_COMBO;
+		backing.start();
+		this.preview.backing = backing;
+	}
+
+	private stopPreview(): void {
+		if (!this.preview) return;
+		this.preview.backing?.stop();
+		void this.preview.synth.ctx.close();
+		this.preview = null;
 	}
 
 	/** 画面下の小さなクレジットボタン。当たり判定の範囲を返す */
@@ -190,4 +326,21 @@ function lockPortrait(): void {
 			err,
 		);
 	});
+}
+
+/** 自分で曲を選ぶまではランダム */
+function loadChoice(): string {
+	try {
+		return localStorage.getItem(SONG_KEY) ?? RANDOM_SONG;
+	} catch {
+		return RANDOM_SONG;
+	}
+}
+
+function saveChoice(id: string): void {
+	try {
+		localStorage.setItem(SONG_KEY, id);
+	} catch {
+		// プライベートブラウズ等で保存できなくても、選んだ曲で遊ぶことはできる
+	}
 }

@@ -1,5 +1,6 @@
 // 楽器・伴奏は Web Audio で合成する。掛け声だけは VOICEVOX で生成した音声を再生する。
 import { FEVER_COMBO, type PadId } from "./rhythm";
+import type { Song } from "./songs";
 import {
 	CREW_ROLES,
 	type VoiceKind,
@@ -130,6 +131,146 @@ export class Synth {
 		for (const freq of freqs) this.tone(t, freq, 0.09, vol, "square");
 	}
 
+	/** スチールドラム風。倍音を少しずらして金属っぽい響きにする */
+	steel(t: number, freq: number, vol = 0.16): void {
+		this.osc("sine", t, 0.4, this.env(t, vol, 0.4), freq * 1.01, freq);
+		this.osc("sine", t, 0.25, this.env(t, vol * 0.45, 0.25), freq * 2);
+		this.osc("sine", t, 0.12, this.env(t, vol * 0.25, 0.12), freq * 3.96);
+	}
+
+	/** 8bit 風の矩形波リード */
+	chipLead(t: number, freq: number, dur: number, vol = 0.06): void {
+		const f = this.ctx.createBiquadFilter();
+		f.type = "lowpass";
+		f.frequency.value = 5000;
+		f.connect(this.env(t, vol, dur));
+		this.osc("square", t, dur, f, freq);
+	}
+
+	/** やわらかく伸びる和音。ゆっくり立ち上げて、ほかの楽器の後ろに敷く */
+	pad(t: number, freqs: number[], dur: number, vol = 0.025): void {
+		const f = this.ctx.createBiquadFilter();
+		f.type = "lowpass";
+		f.frequency.value = 1400;
+		const g = this.ctx.createGain();
+		g.gain.setValueAtTime(0.0001, t);
+		g.gain.exponentialRampToValueAtTime(vol, t + 0.12);
+		g.gain.setValueAtTime(vol, t + dur * 0.7);
+		g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+		f.connect(g);
+		g.connect(this.out);
+		for (const freq of freqs) {
+			for (const detune of [0.997, 1.003])
+				this.osc("sawtooth", t, dur, f, freq * detune);
+		}
+	}
+
+	/** コンガ。ドンのタムより高い帯域で鳴らす */
+	conga(t: number, freq: number, vol = 0.3): void {
+		this.osc("sine", t, 0.18, this.env(t, vol, 0.18), freq * 1.25, freq);
+		this.noiseHit(t, 0.02, vol * 0.4, "bandpass", 2500);
+	}
+
+	/** ノイズのスネア（8bit 風） */
+	noiseSnare(t: number, vol = 0.25): void {
+		this.noiseHit(t, 0.12, vol, "bandpass", 1800, 0.7);
+	}
+
+	/** ブラス風。フィルタを開いてから少し閉じ、「パァッ」と立ち上がる音にする */
+	brass(t: number, freq: number, dur: number, vol = 0.05): void {
+		const f = this.ctx.createBiquadFilter();
+		f.type = "lowpass";
+		f.frequency.setValueAtTime(500, t);
+		f.frequency.exponentialRampToValueAtTime(2600, t + 0.04);
+		f.frequency.exponentialRampToValueAtTime(1200, t + dur);
+		f.connect(this.env(t, vol, dur));
+		this.osc("sawtooth", t, dur, f, freq);
+		this.osc("sawtooth", t, dur, f, freq * 1.005);
+	}
+
+	/** エレピ風。FM（周波数変調）で鍵盤を叩いた瞬間の金属感を出す */
+	epiano(t: number, freq: number, vol = 0.14): void {
+		const carrier = this.ctx.createOscillator();
+		carrier.frequency.value = freq;
+		const mod = this.ctx.createOscillator();
+		mod.frequency.value = freq;
+		const depth = this.ctx.createGain();
+		depth.gain.setValueAtTime(freq * 1.5, t);
+		depth.gain.exponentialRampToValueAtTime(freq * 0.05, t + 0.4);
+		mod.connect(depth);
+		depth.connect(carrier.frequency);
+		carrier.connect(this.env(t, vol, 0.9));
+		for (const o of [carrier, mod]) {
+			o.start(t);
+			o.stop(t + 0.95);
+		}
+	}
+
+	/** 笛。ゆっくり立ち上げてビブラートと息の音を足す */
+	flute(t: number, freq: number, dur: number, vol = 0.09): void {
+		const g = this.ctx.createGain();
+		g.gain.setValueAtTime(0.0001, t);
+		g.gain.exponentialRampToValueAtTime(vol, t + 0.04);
+		g.gain.setValueAtTime(vol, t + dur * 0.7);
+		g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+		g.connect(this.out);
+		const o = this.ctx.createOscillator();
+		o.type = "triangle";
+		o.frequency.value = freq;
+		const vib = this.ctx.createOscillator();
+		const vibAmt = this.ctx.createGain();
+		vib.frequency.value = 5.5;
+		vibAmt.gain.value = freq * 0.012;
+		vib.connect(vibAmt);
+		vibAmt.connect(o.frequency);
+		o.connect(g);
+		for (const x of [o, vib]) {
+			x.start(t);
+			x.stop(t + dur + 0.02);
+		}
+		this.noiseHit(t, 0.06, vol * 0.25, "highpass", 5000);
+	}
+
+	/** 歪んだギターの和音。波形を潰して倍音を増やし、耳に痛い高域は削る */
+	guitar(t: number, freqs: number[], dur: number, vol = 0.03): void {
+		const shaper = this.ctx.createWaveShaper();
+		shaper.curve = DISTORTION;
+		const f = this.ctx.createBiquadFilter();
+		f.type = "lowpass";
+		f.frequency.value = 2400;
+		shaper.connect(f);
+		f.connect(this.env(t, vol, dur));
+		for (const freq of freqs) this.osc("sawtooth", t, dur, shaper, freq);
+	}
+
+	/** シンセのリード。少しずらした 2 本ののこぎり波で厚みを出す */
+	sawLead(t: number, freq: number, dur: number, vol = 0.04): void {
+		const f = this.ctx.createBiquadFilter();
+		f.type = "lowpass";
+		f.frequency.value = 3200;
+		f.connect(this.env(t, vol, dur));
+		for (const detune of [0.994, 1.006])
+			this.osc("sawtooth", t, dur, f, freq * detune);
+	}
+
+	/** 丸いベース。ゆったりした曲用 */
+	roundBass(t: number, freq: number, dur: number, vol = 0.2): void {
+		this.osc("triangle", t, dur, this.env(t, vol, dur), freq);
+	}
+
+	/** スネア。胴鳴りも低くしすぎず、ドンのタムと帯域を分ける */
+	snare(t: number, vol = 0.25): void {
+		this.noiseHit(t, 0.14, vol, "bandpass", 2200, 0.8);
+		this.osc("triangle", t, 0.06, this.env(t, vol * 0.5, 0.06), 330, 220);
+	}
+
+	/** 締太鼓風の高い太鼓 */
+	shime(t: number, vol = 0.25): void {
+		this.osc("sine", t, 0.08, this.env(t, vol, 0.08), 760, 560);
+		this.noiseHit(t, 0.02, vol * 0.5, "bandpass", 3000);
+	}
+
+	/** メトロノーム風のリムクリック */
 	click(t: number, vol = 0.3): void {
 		this.noiseHit(t, 0.025, vol, "bandpass", 3200, 4);
 		this.osc("sine", t, 0.03, this.env(t, vol * 0.4, 0.03), 2400);
@@ -416,7 +557,7 @@ export class Synth {
 /** 子分ごとの出だしのずれ（秒）。そろいすぎると 1 人の声に聞こえるため */
 const CREW_JITTER = [0, 0.012, -0.008, 0.006, -0.012, 0.009];
 
-/** 先読みで伴奏を予約するループ。2 小節（32 ステップ）で一周する */
+/** 先読みで伴奏を予約するループ。曲の終わりまで来たら頭に戻る */
 export class Backing {
 	private timer = 0;
 	private nextStep = 0;
@@ -427,6 +568,7 @@ export class Backing {
 		private readonly synth: Synth,
 		private readonly startTime: number,
 		private readonly beatSec: number,
+		private readonly song: Song,
 	) {}
 
 	start(): void {
@@ -447,109 +589,255 @@ export class Backing {
 		}
 	}
 
-	private playStep(n: number, t: number): void {
+	private playStep(n: number, stepTime: number): void {
 		const s = this.synth;
-		const loopStep = n % LOOP_STEPS;
+		const song = this.song;
+		const loopStep = n % song.steps;
 		const inBar = loopStep % 16;
 		const beat = Math.floor(inBar / 4);
 		const sixteenth = inBar % 4;
 		const sec = this.beatSec / 4;
-		const groove = this.combo >= GROOVE_COMBO;
-		const melody = this.combo >= MELODY_COMBO;
+		const full = this.combo >= FULL_COMBO;
 		const fever = this.combo >= FEVER_COMBO;
+		const chordNotes = song.chords[loopStep] ?? [];
+		const chord = chordNotes.map(hz);
 
-		// 拍の目印は高域のクリック。低域はドン（タム・キック）が使うので伴奏では鳴らさない
+		// 拍の目印は高域のクリック。低域はドン（タム・キック）が使うので伴奏では鳴らさない。
+		// 判定の基準なのでスウィングさせない
 		if (sixteenth === 0) {
-			s.click(t, beat === 0 ? 0.5 : 0.3);
-			if (loopStep === 0) s.bell(t, 1046.5, 0.08, 0.3);
+			s.click(stepTime, beat === 0 ? 0.5 : 0.3);
+			if (loopStep === 0) s.bell(stepTime, 1046.5, 0.08, 0.3);
 		}
 
-		// ハイハット: 通常は 8 分の裏を強めに、盛り上がると 16 分で刻む
-		if (sixteenth === 2) s.hat(t, 0.16, beat === 3 && inBar === 14 && fever);
-		else if (groove && sixteenth !== 0) s.hat(t, 0.06);
+		// 8 分の裏（各拍の 3 つ目の 16 分）を遅らせて跳ねさせる
+		const t = sixteenth === 2 ? stepTime + song.swing * sec : stepTime;
 
-		const bass = BASS_LINE[loopStep];
-		if (bass) s.pluckBass(t, bass[0], bass[1] * sec, 0.16);
+		this.playPerc(t, loopStep, full, fever);
 
-		if (groove) {
-			if (sixteenth === 2) s.stab(t, chordAt(loopStep), 0.035);
-			if (sixteenth === 0 && (beat === 1 || beat === 3)) {
-				s.clap(t, fever ? 0.32 : 0.2);
+		const bass = song.bass.get(loopStep);
+		if (bass) this.playBass(t, hz(bass[0]), bass[1] * sec);
+
+		// 和音・伴奏の刻み・メロディはコンボに関係なく常に鳴らし、ミスしても曲として聴けるようにする
+		const prev = song.chords[(loopStep + song.steps - 1) % song.steps];
+		if (prev !== chordNotes) {
+			s.pad(t, chord, this.chordLength(loopStep) * sec, fever ? 0.03 : 0.022);
+		}
+
+		this.playComp(t, n, chord, sec);
+		const note = song.melody.get(loopStep);
+		// 4 拍目はキメの掛け声が乗るので控えめにする
+		if (note) this.playLead(t, hz(note), beat === 3 ? 0.6 : 1, sec);
+
+		if (fever && note) {
+			// コードの構成音から、メロディのすぐ下の音を選んでハモらせる
+			const harmony = harmonyBelow(note, chordNotes);
+			if (harmony) this.playLead(t, hz(harmony), 0.45, sec);
+			s.bell(t, hz(note) * 2, 0.035, 0.2);
+		}
+	}
+
+	/** 今のコードが何ステップ続くか（曲の終わりでは止める） */
+	private chordLength(loopStep: number): number {
+		const chords = this.song.chords;
+		let len = 1;
+		while (
+			loopStep + len < chords.length &&
+			chords[loopStep + len] === chords[loopStep]
+		) {
+			len++;
+		}
+		return len;
+	}
+
+	private playBass(t: number, freq: number, dur: number): void {
+		const s = this.synth;
+		switch (this.song.bassKind) {
+			case "pluck":
+				s.pluckBass(t, freq, dur, 0.16);
+				break;
+			case "chip":
+				s.chipLead(t, freq, dur * 0.8, 0.07);
+				break;
+			case "round":
+				s.roundBass(t, freq, dur * 0.9, 0.2);
+				break;
+		}
+	}
+
+	private playComp(t: number, n: number, chord: number[], sec: number): void {
+		const s = this.synth;
+		const sixteenth = n % 4;
+		switch (this.song.comp) {
+			case "stab":
+				if (sixteenth === 2) s.stab(t, chord, 0.032);
+				break;
+			case "arp": {
+				const note = chord[n % chord.length];
+				if (!note) break;
+				if (this.song.lead === "chip")
+					s.chipLead(t, note * 2, sec * 0.7, 0.025);
+				else s.sawLead(t, note * 2, sec * 0.7, 0.018);
+				break;
 			}
+			case "power":
+				// 8 分で刻み、拍の頭だけ長く伸ばす
+				if (sixteenth === 0) s.guitar(t, chord, sec * 1.8, 0.03);
+				else if (sixteenth === 2) s.guitar(t, chord, sec * 0.8, 0.022);
+				break;
+			case "none":
+				break;
 		}
+	}
 
-		if (melody) {
-			const note = MELODY[loopStep];
-			// 4 拍目はキメの掛け声が乗るので控えめにする
-			if (note) s.marimba(t, note, beat === 3 ? 0.1 : 0.17);
+	private playLead(t: number, freq: number, level: number, sec: number): void {
+		const s = this.synth;
+		switch (this.song.lead) {
+			case "marimba":
+				s.marimba(t, freq, 0.17 * level);
+				break;
+			case "steel":
+				s.steel(t, freq, 0.16 * level);
+				break;
+			case "chip":
+				s.chipLead(t, freq, sec * 1.6, 0.055 * level);
+				break;
+			case "brass":
+				s.brass(t, freq, sec * 1.6, 0.05 * level);
+				break;
+			case "epiano":
+				s.epiano(t, freq, 0.14 * level);
+				break;
+			case "flute":
+				s.flute(t, freq, sec * 1.8, 0.09 * level);
+				break;
+			case "saw":
+				s.sawLead(t, freq, sec * 1.7, 0.04 * level);
+				break;
 		}
+	}
 
-		if (fever) {
-			const note = MELODY[loopStep];
-			if (note) s.bell(t, note * 2, 0.04, 0.2);
-			const arp = chordAt(loopStep)[n % 3];
-			if (arp && sixteenth % 2 === 1) s.tone(t, arp * 2, sec * 0.8, 0.025);
-			s.shaker(t, sixteenth === 2 ? 0.14 : 0.07);
-			// 2 小節目の終わりに小さなフィルを入れて、次の周回への勢いをつける
-			if (loopStep >= 30) s.clap(t, 0.18);
+	/** groove が true（コンボ 2 以上）で打楽器を足す */
+	private playPerc(
+		t: number,
+		loopStep: number,
+		groove: boolean,
+		fever: boolean,
+	): void {
+		const s = this.synth;
+		const inBar = loopStep % 16;
+		const beat = Math.floor(inBar / 4);
+		const sixteenth = inBar % 4;
+		const backbeat = sixteenth === 0 && (beat === 1 || beat === 3);
+		// 2 小節ごとのフレーズの終わり。小さなフィルで次のフレーズへの勢いをつける
+		const fill = fever && loopStep % 32 >= 30;
+
+		switch (this.song.perc) {
+			case "pop":
+				if (sixteenth === 2) s.hat(t, 0.16);
+				else if (groove && sixteenth !== 0) s.hat(t, 0.06);
+				if (groove && backbeat) s.clap(t, fever ? 0.32 : 0.2);
+				if (fever) s.shaker(t, sixteenth === 2 ? 0.14 : 0.07);
+				if (fill) s.clap(t, 0.18);
+				break;
+			case "tropical": {
+				s.shaker(t, sixteenth === 2 ? 0.16 : 0.07);
+				const conga = TROPICAL_CONGA[inBar];
+				if (groove && conga) s.conga(t, conga, 0.26);
+				if (groove && sixteenth === 0 && beat === 3) s.clap(t, 0.16);
+				if (fever && sixteenth === 2) s.hat(t, 0.1);
+				if (fill) s.conga(t, 420, 0.24);
+				break;
+			}
+			case "chip":
+				if (sixteenth === 2) s.hat(t, 0.12);
+				else if (fever && sixteenth !== 0) s.hat(t, 0.05);
+				if (groove && backbeat) s.noiseSnare(t, fever ? 0.3 : 0.22);
+				if (fill) s.noiseSnare(t, 0.2);
+				break;
+			case "funk":
+				// 16 分を全部刻み、裏にアクセント。スネアの前に小さなゴーストを入れる
+				if (sixteenth !== 0) s.hat(t, sixteenth === 2 ? 0.15 : 0.06);
+				if (groove && backbeat) s.snare(t, fever ? 0.3 : 0.24);
+				if (groove && (inBar === 7 || inBar === 15)) s.snare(t, 0.07);
+				if (fever) s.shaker(t, 0.06);
+				if (fill) s.snare(t, 0.18);
+				break;
+			case "lofi":
+				if (sixteenth === 2) s.hat(t, 0.1);
+				if (groove && backbeat) s.noiseSnare(t, 0.14);
+				if (fever && sixteenth === 0) s.shaker(t, 0.08);
+				break;
+			case "march":
+				if (groove && sixteenth === 2) s.snare(t, 0.16);
+				// 各小節の終わりにロール
+				if (groove && inBar >= 13) s.snare(t, 0.1);
+				if (groove && loopStep === 0) s.crash(t, 0.18);
+				if (sixteenth === 0 && (beat === 1 || beat === 3)) s.hat(t, 0.08);
+				if (fever && sixteenth === 0) s.crash(t, 0.06);
+				break;
+			case "matsuri":
+				// テン・テケ のくり返し
+				if ([0, 2, 3, 8, 10, 11].includes(inBar))
+					s.shime(t, groove ? 0.24 : 0.16);
+				if (groove && sixteenth === 0 && (beat === 1 || beat === 3)) {
+					s.bell(t, 2093, 0.07, 0.25);
+					s.bell(t, 2960, 0.04, 0.2);
+				}
+				if (fever && backbeat) s.clap(t, 0.24);
+				if (fill) s.shime(t, 0.22);
+				break;
+			case "rock":
+				if (sixteenth === 0 || sixteenth === 2)
+					s.hat(t, sixteenth === 0 ? 0.1 : 0.14);
+				if (groove && backbeat) s.snare(t, fever ? 0.34 : 0.26);
+				if (groove && loopStep === 0) s.crash(t, 0.22);
+				if (fever && sixteenth === 0 && beat === 0) s.crash(t, 0.12);
+				if (fill) s.snare(t, 0.22);
+				break;
 		}
 	}
 }
 
-const LOOP_STEPS = 32;
-/** 裏打ち・クラップ・16 分ハイハットが入るコンボ数 */
-const GROOVE_COMBO = 1;
-/** マリンバのメロディが入るコンボ数 */
-const MELODY_COMBO = 2;
+/** 打楽器が増えるコンボ数 */
+export const FULL_COMBO = 2;
+
+/** コードの構成音のうち、メロディより下で一番近い音（3〜9 半音下）を返す */
+function harmonyBelow(note: number, chord: number[]): number | null {
+	let best: number | null = null;
+	for (const c of chord) {
+		for (let octave = -2; octave <= 2; octave++) {
+			const candidate = c + octave * 12;
+			const gap = note - candidate;
+			if (gap >= 3 && gap <= 9 && (best === null || candidate > best)) {
+				best = candidate;
+			}
+		}
+	}
+	return best;
+}
+
+/** トロピカルのコンガ（小節内ステップ → 周波数） */
+const TROPICAL_CONGA: Record<number, number> = {
+	2: 330,
+	3: 330,
+	6: 260,
+	10: 330,
+	11: 330,
+	14: 260,
+};
 
 const hz = (midi: number) => 440 * 2 ** ((midi - 69) / 12);
 
-/** 1 小節目は C、2 小節目は前半 F・後半 G */
-function chordAt(loopStep: number): number[] {
-	if (loopStep < 16) return [hz(60), hz(64), hz(67)];
-	if (loopStep < 24) return [hz(65), hz(69), hz(72)];
-	return [hz(67), hz(71), hz(74)];
-}
-
-/** ステップ → [周波数, 長さ（ステップ数）]。シンコペーションで弾ませる */
-const BASS_LINE: Record<number, [number, number]> = {
-	0: [hz(48), 2],
-	3: [hz(60), 1],
-	6: [hz(55), 2],
-	8: [hz(48), 1],
-	10: [hz(60), 1],
-	11: [hz(55), 2],
-	14: [hz(57), 2],
-	16: [hz(53), 2],
-	19: [hz(65), 1],
-	22: [hz(60), 2],
-	24: [hz(55), 1],
-	26: [hz(67), 1],
-	27: [hz(62), 2],
-	30: [hz(59), 2],
-};
-
-/** マリンバのメロディ（ステップ → 周波数）。ペンタトニック中心の 2 小節フレーズ */
-const MELODY: Record<number, number> = {
-	0: hz(76),
-	2: hz(79),
-	3: hz(81),
-	4: hz(79),
-	6: hz(76),
-	8: hz(72),
-	10: hz(74),
-	11: hz(76),
-	14: hz(79),
-	16: hz(81),
-	18: hz(79),
-	19: hz(76),
-	20: hz(77),
-	22: hz(81),
-	24: hz(79),
-	27: hz(74),
-	28: hz(76),
-	30: hz(72),
-};
+/** ギターの歪み用の波形変換カーブ */
+const DISTORTION = (() => {
+	const n = 1024;
+	const curve = new Float32Array(n);
+	for (let i = 0; i < n; i++) {
+		const x = (i / (n - 1)) * 2 - 1;
+		curve[i] = Math.tanh(x * 4);
+	}
+	return curve;
+})();
 
 type Vowel = "a" | "i" | "u" | "e" | "o" | "n";
 interface Syllable {

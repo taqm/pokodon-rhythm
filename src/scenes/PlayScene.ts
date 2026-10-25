@@ -95,6 +95,7 @@ export class PlayScene extends Phaser.Scene {
 		this.beatBar = new BeatBar(this, 30, 128, W - 60, 56);
 		this.makeCrew();
 		this.makeTexts();
+		this.showSongName();
 		this.makePads();
 		this.makeEffects();
 		this.makeMenu();
@@ -283,6 +284,33 @@ export class PlayScene extends Phaser.Scene {
 			.setOrigin(0.5);
 
 		this.frame = this.add.graphics().setAlpha(0);
+	}
+
+	/** 今回の曲名を少しだけ出す（ランダムで選ばれたときに何の曲か分かるように） */
+	private showSongName(): void {
+		const label = this.add
+			.text(W / 2, 260, `きょく: ${this.conductor.song.name}`, {
+				fontFamily: FONT,
+				fontSize: "16px",
+				fontStyle: "700",
+				color: hex(C.textMid),
+				backgroundColor: hex(C.card),
+				padding: { x: 16, y: 8 },
+			})
+			.setOrigin(0.5)
+			.setAlpha(0);
+		this.tweens.chain({
+			targets: label,
+			tweens: [
+				{ alpha: 1, y: 250, duration: 250, ease: "Quad.Out" },
+				{
+					alpha: 0,
+					delay: 1800,
+					duration: 400,
+					onComplete: () => label.destroy(),
+				},
+			],
+		});
 	}
 
 	private makePads(): void {

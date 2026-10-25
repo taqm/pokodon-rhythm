@@ -1,5 +1,6 @@
 import { Backing, Synth } from "./audio";
 import { BPM, RhythmState } from "./rhythm";
+import { findSong, type Song } from "./songs";
 import { VOICE_MANIFEST, VOICE_URLS } from "./voice";
 
 export const BEAT_SEC = 60 / BPM;
@@ -10,11 +11,12 @@ export class Conductor {
 	readonly synth: Synth;
 	readonly rhythm = new RhythmState(BEAT_SEC);
 	readonly startTime: number;
+	readonly song: Song;
 	private readonly backing: Backing;
 	offsetMs = loadOffset();
 
 	/** ユーザ操作のイベントハンドラ内で呼ぶこと（音声の再開に必要） */
-	constructor() {
+	constructor(songId: string) {
 		// iOS で消音スイッチがオンでも鳴るように再生カテゴリを指定する
 		const nav = navigator as Navigator & { audioSession?: { type: string } };
 		if (nav.audioSession) nav.audioSession.type = "playback";
@@ -24,7 +26,8 @@ export class Conductor {
 		// 最初の応答は早くても 1 小節後なので、読み込みを待たずに始める
 		void this.synth.loadVoices(VOICE_URLS, VOICE_MANIFEST);
 		this.startTime = this.synth.ctx.currentTime + 0.4;
-		this.backing = new Backing(this.synth, this.startTime, BEAT_SEC);
+		this.song = findSong(songId);
+		this.backing = new Backing(this.synth, this.startTime, BEAT_SEC, this.song);
 		this.backing.start();
 	}
 
