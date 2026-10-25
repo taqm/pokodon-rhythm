@@ -87,9 +87,20 @@
 | `src/scenes/PlayScene.ts`  | プレイ画面。入力・演出・応答の予約                                         |
 | `src/objects/*.ts`         | キャラ（Blob）と拍バー（BeatBar）                                          |
 | `server.ts`                | 開発用サーバ（Bun の HTML import）                                         |
+| `public/`                  | manifest とアプリアイコン。ルート直下で配信し、ビルド時に dist/ へコピー   |
 
 描画は Phaser 4（canvas / WebGL）。パッドの入力は Phaser の入力キューを通さず、
 canvas のネイティブ `pointerdown` で直接受ける（遅延を減らすため）。
+
+## 画面の向き・アプリ化
+
+- 縦画面専用。ブラウザでは向きを強制できないため、次の 3 段で対応する。
+  - manifest の `orientation: portrait`（ホーム画面に追加して起動したとき。主に Android で有効）
+  - 開始時に `screen.orientation.lock("portrait")` を試す（対応端末のみ。失敗はログに出して続行）
+  - 横向きのスマホ（横向きかつ高さ 540px 以下）では「スマホを縦にしてね」の案内を重ねる
+- アイコンはオリジナルのキャラ（ピンクのスライム）と 3 色の拍。`public/icon.svg` が原本で、
+  PNG（512 / 192 / 180 / 32px）はそこから描き出す。ホーム画面用の PNG は端末側で切り抜かれるので角丸なしの正方形にする。
+- manifest は中のアイコン URL を固定にしたいのでバンドラを通さず、`src/main.ts` が実行時に `<link rel="manifest">` を足す。
 
 ## スコープ外
 

@@ -49,6 +49,11 @@ docker stop pokodon-voicevox
 
 音声: VOICEVOX:ずんだもん、VOICEVOX:白上虎太郎、VOICEVOX:櫻歌ミコ、VOICEVOX:猫使アル、VOICEVOX:春日部つむぎ、VOICEVOX:猫使ビィ、VOICEVOX:満別花丸
 
+## アプリアイコン
+
+原本は `public/icon.svg`。PNG（`icon-512.png` / `icon-192.png` / `apple-touch-icon.png` / `favicon-32.png`）は
+この SVG をブラウザで描画して書き出し、`sips -z` で縮小して作った。絵柄を変えたら PNG も作り直すこと。
+
 ## 実機での注意
 
 - iOS は消音スイッチがオンでも鳴るよう `navigator.audioSession` を指定しているが、古い iOS では鳴らないことがある。

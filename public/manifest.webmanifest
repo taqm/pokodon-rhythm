@@ -1,0 +1,25 @@
+{
+	"name": "ポコドン・リズム",
+	"short_name": "ポコドン",
+	"description": "リズムよくボタンをおそう！",
+	"start_url": "/",
+	"display": "fullscreen",
+	"orientation": "portrait",
+	"background_color": "#fff5f7",
+	"theme_color": "#fff5f7",
+	"icons": [
+		{
+			"src": "/icon-192.png",
+			"sizes": "192x192",
+			"type": "image/png",
+			"purpose": "any maskable"
+		},
+		{
+			"src": "/icon-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "any maskable"
+		},
+		{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+	]
+}

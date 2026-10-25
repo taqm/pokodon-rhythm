@@ -8,6 +8,12 @@
 		/>
 		<meta name="theme-color" content="#fff5f7" />
 		<title>ポコドン・リズム</title>
+		<link rel="icon" href="./public/icon.svg" type="image/svg+xml" />
+		<link rel="icon" href="./public/favicon-32.png" sizes="32x32" type="image/png" />
+		<link rel="apple-touch-icon" href="./public/apple-touch-icon.png" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-title" content="ポコドン" />
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link
 			href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700;900&family=DM+Mono:wght@400;500&display=swap"
@@ -17,6 +23,14 @@
 	</head>
 	<body>
 		<div id="game"></div>
+		<div class="rotate" aria-live="polite">
+			<svg viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
+				<rect x="20" y="6" width="24" height="44" rx="5" fill="none" stroke="currentColor" stroke-width="4" />
+				<path d="M14 54 a22 22 0 0 0 36 0" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" />
+				<path d="M44 48 l6 6 l-8 3" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+			</svg>
+			<p>スマホを縦にしてね</p>
+		</div>
 		<script type="module" src="./src/main.ts"></script>
 	</body>
 </html>

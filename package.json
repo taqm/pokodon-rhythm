@@ -9,7 +9,7 @@
 	},
 	"scripts": {
 		"dev": "bun --hot server.ts",
-		"build": "bun build ./index.html --outdir dist --minify",
+		"build": "bun build ./index.html --outdir dist --minify && cp -R public/. dist/",
 		"test": "bun test",
 		"typecheck": "tsc --noEmit",
 		"check": "biome check .",

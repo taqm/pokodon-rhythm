@@ -16,3 +16,30 @@ body {
 	inset: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
 	touch-action: none;
 }
+
+/* 縦画面専用。ブラウザでは向きを強制できないので、横向きのスマホでは案内を重ねる */
+.rotate {
+	display: none;
+}
+
+@media (orientation: landscape) and (max-height: 540px) {
+	.rotate {
+		position: fixed;
+		inset: 0;
+		z-index: 10;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 16px;
+		background: #fff5f7;
+		color: #e8609a;
+		font-family: "Zen Maru Gothic", "Hiragino Sans", sans-serif;
+		font-size: 20px;
+		font-weight: 900;
+	}
+
+	.rotate p {
+		margin: 0;
+	}
+}

@@ -122,7 +122,7 @@ export class BeatBar extends Phaser.GameObjects.Container {
 		if (turn === this.turn) return;
 		this.turn = turn;
 		const crew = turn === "crew";
-		this.turnLabel.setText(crew ? "こぶんの番" : "あなたの番");
+		this.turnLabel.setText(crew ? "みんなの番" : "あなたの番");
 		this.turnLabel.setBackgroundColor(
 			hex(crew ? PAD_COLOR.shaka.strong : PAD_COLOR.don.strong),
 		);

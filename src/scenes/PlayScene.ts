@@ -510,7 +510,7 @@ export class PlayScene extends Phaser.Scene {
 			?.explode(res.judge === "perfect" ? 14 : 8, PAD_X[pad], PAD_Y - 20);
 		this.showJudge(res.judge);
 		if (res.interrupt) {
-			if (res.broke) this.setPlayerLine("こぶんの番だよ！");
+			if (res.broke) this.setPlayerLine("みんなの番だよ！");
 		} else {
 			this.beatBar.mark(
 				res.beat,
