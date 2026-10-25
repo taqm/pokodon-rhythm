@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "my-ratatan",
+      "name": "pokodon-rhythm",
       "dependencies": {
         "phaser": "^4.2.1",
       },
