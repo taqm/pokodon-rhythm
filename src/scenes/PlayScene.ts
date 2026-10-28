@@ -691,7 +691,10 @@ export class PlayScene extends Phaser.Scene {
 	}
 
 	private onFinish(pad: PadId, unison: boolean): void {
-		this.setChant(`${this.chantText.text} ${CHANT[pad].finish}`, true);
+		// キメは 3 拍目の掛け声が伸びたものなので、足さずに 3 拍目の語と置き換える
+		const words = this.chantText.text.split(" ");
+		words[words.length - 1] = CHANT[pad].finish;
+		this.setChant(words.join(" "), true);
 		this.beatBar.celebrate(PAD_COLOR[pad].base);
 		const fever = this.conductor.rhythm.fever;
 		for (const { pad: id, blob } of this.crew) {
