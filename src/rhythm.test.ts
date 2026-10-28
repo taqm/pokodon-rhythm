@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { FEVER_COMBO, RhythmState } from "./rhythm";
+import { FEVER_COMBO, GOOD_WINDOW, RhythmState } from "./rhythm";
 
 const BEAT = 0.5;
 const at = (bar: number, beat: number, offset = 0) =>
@@ -51,12 +51,70 @@ describe("RhythmState", () => {
 		expect(res.broke).toBe(true);
 	});
 
-	test("拍を飛ばすとそろわない", () => {
+	test("0 拍目を休んで 1・2 拍目でもそろう", () => {
 		const r = new RhythmState(BEAT);
-		r.tap("don", at(0, 0));
-		const res = r.tap("don", at(0, 2));
+		r.tap("don", at(0, 1));
+		const res = r.tap("shaka", at(0, 2));
+		expect(res.broke).toBe(false);
+		expect(res.complete).toEqual([null, "don", "shaka"]);
+		expect(r.combo).toBe(1);
+	});
+
+	test("1 拍目を休んで 0・2 拍目でもそろう", () => {
+		const r = new RhythmState(BEAT);
+		r.tap("poko", at(0, 0));
+		const res = r.tap("poko", at(0, 2));
+		expect(res.broke).toBe(false);
+		expect(res.complete).toEqual(["poko", null, "poko"]);
+		expect(r.combo).toBe(1);
+	});
+
+	test("2 拍目だけではそろわずコンボが切れる", () => {
+		const r = new RhythmState(BEAT);
+		for (const b of [0, 1, 2]) r.tap("don", at(0, b));
+		r.tick(at(1, 3.6));
+		const res = r.tap("don", at(2, 2));
 		expect(res.broke).toBe(true);
 		expect(res.complete).toBeNull();
+		expect(r.combo).toBe(0);
+	});
+
+	test("2 拍目を休んで 0・1 拍目でも、2 拍目の判定幅を過ぎるとそろう", () => {
+		const r = new RhythmState(BEAT);
+		r.tap("don", at(0, 0));
+		r.tap("shaka", at(0, 1));
+		// 2 拍目を叩く可能性が残っているうちはまだ成立させない
+		expect(r.settle(at(0, 2, GOOD_WINDOW))).toBeNull();
+		expect(r.settle(at(0, 2, GOOD_WINDOW + 0.01))).toEqual({
+			bar: 0,
+			pads: ["don", "shaka", null],
+		});
+		expect(r.combo).toBe(1);
+		// 成立は 1 回だけで、小節の終わりにコンボは切れない
+		expect(r.settle(at(0, 3))).toBeNull();
+		expect(r.tick(at(0, 3.6))).toEqual([]);
+		expect(r.combo).toBe(1);
+	});
+
+	test("成立したあとに 2 拍目を遅れて叩くと二度押し扱いでミス", () => {
+		const r = new RhythmState(BEAT);
+		r.tap("don", at(0, 0));
+		r.tap("don", at(0, 1));
+		r.settle(at(0, 2, GOOD_WINDOW + 0.01));
+		const late = r.tap("don", at(0, 2, 0.2));
+		expect(late.judge).toBe("miss");
+		expect(late.broke).toBe(true);
+		expect(r.combo).toBe(0);
+	});
+
+	test("1 打だけではそろわず、小節の終わりでコンボが切れる", () => {
+		const r = new RhythmState(BEAT);
+		for (const b of [0, 1, 2]) r.tap("don", at(0, b));
+		r.tick(at(1, 3.6));
+		expect(r.tap("don", at(2, 0)).broke).toBe(false);
+		expect(r.settle(at(2, 3))).toBeNull();
+		expect(r.tick(at(2, 3.6))).toEqual([{ bar: 2, broke: true }]);
+		expect(r.combo).toBe(0);
 	});
 
 	test("そろった次の小節は子分の番なので、叩かなくてもコンボは続く", () => {

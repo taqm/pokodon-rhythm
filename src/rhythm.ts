@@ -1,6 +1,7 @@
 // リズム判定の純粋ロジック。時刻はすべて「曲の開始からの秒数」で受け取る。
 // 1 小節 = 4 拍。0〜2 拍目が入力枠、3 拍目は休符（フィニッシュが鳴る拍）。
-// 2 小節で 1 セット。3 拍そろった次の小節は子分が同じリズムを返す「応答小節」で、プレイヤーは叩かない。
+// 入力枠のうち MIN_HITS 拍以上を叩けば「そろった」とする。休む拍はどれでもよい。
+// 2 小節で 1 セット。そろった次の小節は子分が同じリズムを返す「応答小節」で、プレイヤーは叩かない。
 
 export type PadId = "don" | "shaka" | "poko";
 export type Judge = "perfect" | "good" | "miss";
@@ -8,6 +9,7 @@ export type Judge = "perfect" | "good" | "miss";
 export const BPM = 130;
 export const BEATS_PER_BAR = 4;
 export const INPUT_BEATS = 3;
+export const MIN_HITS = 2;
 export const PERFECT_WINDOW = 0.075;
 export const GOOD_WINDOW = 0.16;
 export const FEVER_COMBO = 3;
@@ -22,8 +24,14 @@ export interface TapResult {
 	broke: boolean;
 	/** 応答小節（子分の番）に叩いてしまった */
 	interrupt: boolean;
-	/** 3 拍そろった瞬間だけ、入力されたパッド列が入る */
-	complete: PadId[] | null;
+	/** そろった瞬間だけ、入力枠の拍ごとのパッドが入る（休んだ拍は null） */
+	complete: (PadId | null)[] | null;
+}
+
+export interface Completion {
+	bar: number;
+	/** 入力枠の拍ごとのパッド（休んだ拍は null） */
+	pads: (PadId | null)[];
 }
 
 export interface BarEnd {
@@ -35,7 +43,9 @@ export interface BarEnd {
 export class RhythmState {
 	combo = 0;
 	private bar = -1;
-	private hits: PadId[] = [];
+	/** 入力枠の拍ごとに叩いたパッド。まだ叩いていない拍は null */
+	private hits: (PadId | null)[] = emptyHits();
+	private lastBeat = -1;
 	private failed = false;
 	private completed = false;
 	private lastResolvedBar = -1;
@@ -90,7 +100,8 @@ export class RhythmState {
 		}
 		if (bar !== this.bar) {
 			this.bar = bar;
-			this.hits = [];
+			this.hits = emptyHits();
+			this.lastBeat = -1;
 			this.failed = false;
 			this.completed = false;
 		}
@@ -119,22 +130,38 @@ export class RhythmState {
 			}
 			return result;
 		}
-		if (timing === "miss" || this.hits.length !== beat) {
-			// タイミング外れ・二度押し・拍の飛ばし
-			if (this.hits.length > beat) result.judge = "miss";
+		if (beat <= this.lastBeat) {
+			// 二度押し
+			result.judge = "miss";
+			result.broke = this.breakCombo();
+			return result;
+		}
+		const isLast = beat === INPUT_BEATS - 1;
+		if (timing === "miss" || (isLast && this.hitCount() + 1 < MIN_HITS)) {
+			// タイミング外れ、もしくは最後の拍だけでは打数が足りない
 			result.broke = this.breakCombo();
 			return result;
 		}
 
-		this.hits.push(pad);
-		if (this.hits.length === INPUT_BEATS) {
-			this.completed = true;
-			this.combo++;
-			this.responseBar = bar + 1;
-			this.responseInterrupted = false;
-			result.complete = [...this.hits];
-		}
+		this.hits[beat] = pad;
+		this.lastBeat = beat;
+		if (isLast) result.complete = this.complete();
 		return result;
+	}
+
+	/**
+	 * 入力枠の最後の拍を叩かずに MIN_HITS 打以上そろっている小節を、最後の拍の判定幅を過ぎた時点で成立させる。
+	 * 最後の拍を叩くかどうかはその時点まで分からないため、tap ではなく時刻の進みで決める。
+	 * 休符拍のキメを予約できるよう、tick より先に毎フレーム呼ぶ。
+	 */
+	settle(t: number): Completion | null {
+		if (this.bar <= this.lastResolvedBar || this.failed || this.completed) {
+			return null;
+		}
+		const deadline =
+			(this.bar * BEATS_PER_BAR + INPUT_BEATS - 1) * this.beatSec + GOOD_WINDOW;
+		if (t <= deadline || this.hitCount() < MIN_HITS) return null;
+		return { bar: this.bar, pads: this.complete() };
 	}
 
 	/**
@@ -154,11 +181,23 @@ export class RhythmState {
 				this.lastResolvedBar === this.bar && this.completed && !this.failed;
 			if (done) continue;
 			const hadInput = this.lastResolvedBar === this.bar && !this.failed;
-			const broke = this.combo > 0 || (hadInput && this.hits.length > 0);
+			const broke = this.combo > 0 || (hadInput && this.hitCount() > 0);
 			if (this.combo > 0) this.combo = 0;
 			if (broke) ended.push({ bar: this.lastResolvedBar, broke: true });
 		}
 		return ended;
+	}
+
+	private complete(): (PadId | null)[] {
+		this.completed = true;
+		this.combo++;
+		this.responseBar = this.bar + 1;
+		this.responseInterrupted = false;
+		return [...this.hits];
+	}
+
+	private hitCount(): number {
+		return this.hits.filter((p) => p !== null).length;
 	}
 
 	private breakCombo(): boolean {
@@ -167,4 +206,8 @@ export class RhythmState {
 		this.combo = 0;
 		return wasActive;
 	}
+}
+
+function emptyHits(): (PadId | null)[] {
+	return Array.from({ length: INPUT_BEATS }, () => null);
 }

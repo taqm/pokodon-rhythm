@@ -644,25 +644,31 @@ export class PlayScene extends Phaser.Scene {
 	/**
 	 * 入力がそろった小節の休符拍でプレイヤー側のキメを鳴らし、
 	 * 次の小節で子分たちに同じリズムを歌い返させる。音は先に予約し、演出は聞こえる瞬間に出す。
+	 * キメは入力枠の最後の拍を叩いたときだけで、そのパッドで決まる。
 	 */
-	private scheduleResponse(bar: number, pads: PadId[]): void {
+	private scheduleResponse(bar: number, pads: (PadId | null)[]): void {
 		const { synth, rhythm } = this.conductor;
 		const fever = rhythm.fever;
-		const last = pads[pads.length - 1] ?? "don";
-		const unison = pads.every((p) => p === last);
+		const last = pads[pads.length - 1] ?? null;
+		const first = pads.findIndex((p) => p !== null);
 		const beatAt = (b: number, beat: number) =>
 			(b * BEATS_PER_BAR + beat) * BEAT_SEC;
 
-		synth.playerFinish(last, this.conductor.audioTimeAt(beatAt(bar, 3)));
+		if (last) {
+			synth.playerFinish(last, this.conductor.audioTimeAt(beatAt(bar, 3)));
+		}
 		this.responseBar = bar + 1;
 
 		pads.forEach((p, i) => {
+			if (p === null) return;
 			const at = beatAt(bar + 1, i);
 			const audioAt = this.conductor.audioTimeAt(at);
 			synth.padPhrase(p, audioAt, BEAT_SEC);
 			synth.crewChant(p, audioAt, BEAT_SEC, i === pads.length - 1);
-			this.pending.push({ at, fn: () => this.onCrewBeat(p, i) });
+			this.pending.push({ at, fn: () => this.onCrewBeat(p, i, i === first) });
 		});
+		if (!last) return;
+		const unison = pads.every((p) => p === null || p === last);
 		const finishAt = beatAt(bar + 1, 3);
 		const audioFinish = this.conductor.audioTimeAt(finishAt);
 		synth.finisher(last, audioFinish, fever);
@@ -673,14 +679,14 @@ export class PlayScene extends Phaser.Scene {
 		});
 	}
 
-	private onCrewBeat(pad: PadId, beat: number): void {
+	private onCrewBeat(pad: PadId, beat: number, first: boolean): void {
 		for (const c of this.crew) {
 			if (c.pad !== pad) continue;
 			c.blob.shout();
 			c.blob.hop();
 		}
 		this.beatBar.mark(beat, PAD_COLOR[pad].base, "perfect");
-		const cur = beat === 0 ? "" : this.chantText.text;
+		const cur = first ? "" : this.chantText.text;
 		this.setChant(`${cur}${cur ? " " : ""}${CHANT[pad].hit}`);
 	}
 
@@ -877,9 +883,10 @@ export class PlayScene extends Phaser.Scene {
 			return false;
 		});
 
-		for (const end of this.conductor.rhythm.tick(
-			this.conductor.judgeTime(now),
-		)) {
+		const judgeT = this.conductor.judgeTime(now);
+		const settled = this.conductor.rhythm.settle(judgeT);
+		if (settled) this.scheduleResponse(settled.bar, settled.pads);
+		for (const end of this.conductor.rhythm.tick(judgeT)) {
 			if (end.broke) this.onBroke();
 		}
 		this.renderCombo();

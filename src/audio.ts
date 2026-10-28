@@ -359,7 +359,7 @@ export class Synth {
 		}
 	}
 
-	/** 3 拍そろったときに休符拍で鳴るキメ */
+	/** 入力がそろったときに休符拍で鳴るキメ */
 	finisher(pad: PadId, t: number, fever: boolean): void {
 		const root = { don: 196, shaka: 262, poko: 330 }[pad];
 		switch (pad) {
