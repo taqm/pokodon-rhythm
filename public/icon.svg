@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>ポコドン・リズム</title>
   <!-- 背景。マスカブルアイコンとして切り抜かれても絵柄が中央 80% に収まるよう配置する -->
   <rect width="512" height="512" rx="112" fill="#ffe4ef"/>
   <ellipse cx="256" cy="372" rx="132" ry="18" fill="#3d2040" opacity="0.12"/>
