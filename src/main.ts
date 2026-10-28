@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { ZOOM } from "./hidpi";
 import { C, H, W } from "./palette";
 import { PlayScene } from "./scenes/PlayScene";
 import { TitleScene } from "./scenes/TitleScene";
@@ -28,8 +29,8 @@ await Promise.allSettled([
 new Phaser.Game({
 	type: Phaser.AUTO,
 	parent: "game",
-	width: W,
-	height: H,
+	width: W * ZOOM,
+	height: H * ZOOM,
 	backgroundColor: C.bg,
 	scale: {
 		mode: Phaser.Scale.FIT,

@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { Backing, FULL_COMBO, Synth } from "../audio";
 import { BEAT_SEC, Conductor } from "../conductor";
+import { applyHiDpi, ZOOM } from "../hidpi";
 import { Blob } from "../objects/Blob";
 import { C, FONT, H, hex, PAD_COLOR, PAD_ORDER, W } from "../palette";
 import { findSong, pickSong, RANDOM_LABEL, RANDOM_SONG, SONGS } from "../songs";
@@ -23,6 +24,7 @@ export class TitleScene extends Phaser.Scene {
 	}
 
 	create(): void {
+		applyHiDpi(this);
 		this.cameras.main.setBackgroundColor(C.sky);
 		this.add.rectangle(W / 2, 420, W, 120, C.hillFront).setOrigin(0.5, 0);
 		this.add.ellipse(90, 430, 360, 160, C.hillBack);
@@ -98,8 +100,8 @@ export class TitleScene extends Phaser.Scene {
 			this.scene.start("play", { conductor });
 		};
 		const onPointer = (ev: PointerEvent) => {
-			const x = this.scale.transformX(ev.pageX);
-			const y = this.scale.transformY(ev.pageY);
+			const x = this.scale.transformX(ev.pageX) / ZOOM;
+			const y = this.scale.transformY(ev.pageY) / ZOOM;
 			if (modal.visible) {
 				modal.setVisible(false);
 			} else if (creditBounds.contains(x, y)) {

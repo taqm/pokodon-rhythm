@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { BEAT_SEC, type Conductor } from "../conductor";
+import { applyHiDpi, ZOOM } from "../hidpi";
 import { BeatBar } from "../objects/BeatBar";
 import { Blob } from "../objects/Blob";
 import {
@@ -95,6 +96,7 @@ export class PlayScene extends Phaser.Scene {
 	}
 
 	create(): void {
+		applyHiDpi(this);
 		this.makeTextures();
 		this.makeBackground();
 		this.makeHud();
@@ -508,10 +510,10 @@ export class PlayScene extends Phaser.Scene {
 		let dragging = false;
 		zone.on("pointerdown", (p: Phaser.Input.Pointer) => {
 			dragging = true;
-			apply(p.x);
+			apply(p.worldX);
 		});
 		const move = (p: Phaser.Input.Pointer) => {
-			if (dragging) apply(p.x);
+			if (dragging) apply(p.worldX);
 		};
 		const up = () => {
 			dragging = false;
@@ -579,8 +581,8 @@ export class PlayScene extends Phaser.Scene {
 		const scale = this.scale;
 		const down = (ev: PointerEvent) => {
 			if (this.menu.visible) return;
-			const x = scale.transformX(ev.pageX);
-			const y = scale.transformY(ev.pageY);
+			const x = scale.transformX(ev.pageX) / ZOOM;
+			const y = scale.transformY(ev.pageY) / ZOOM;
 			for (const id of PAD_ORDER) {
 				if (Phaser.Math.Distance.Between(x, y, PAD_X[id], PAD_Y) <= PAD_R + 8) {
 					ev.preventDefault();
